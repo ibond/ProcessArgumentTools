@@ -10,11 +10,10 @@ namespace ProcessArgumentTools
 	/// <summary>
 	/// This class represents an escaped command line argument or arguments.
 	/// </summary>
-	public struct Argument
+	public struct Argument : IEquatable<Argument>
 	{
-		#region Constructors
+		#region Constructors and Conversions
 		// =====================================================================
-
 
 		/// <summary>
 		/// Construct an argument from an unescaped argument string that represents a single argument.  This will use the default policy.
@@ -42,8 +41,96 @@ namespace ProcessArgumentTools
 			m_policy = policy;
 		}
 
+		/// <summary>
+		/// Implicit conversion operator to convert an argument to a string.
+		/// </summary>
+		/// <param name="path">The argument to be converted.</param>
+		/// <returns>The argument in string form.</returns>
+		public static implicit operator string(Argument argument)
+		{
+			return argument.m_arg;
+		}
+
 		// =====================================================================
 		#endregion
+
+
+		#region Equality and Equivalence
+		// =====================================================================
+
+		/// <summary>
+		/// Implement IEquatable.Equals method.
+		/// </summary>
+		/// <param name="other">The argument against which we are comparing ourselves.</param>
+		/// <returns>True if the Argument objects are value equal, false otherwise.</returns>
+		public bool Equals(Argument other)
+		{
+			return this == other;
+		}
+
+		/// <summary>
+		/// Override the Equals method.
+		/// </summary>
+		/// <param name="obj">The object that we are comparing ourselves to.</param>
+		/// <returns>true if the Argument objects are value equal, false otherwise.</returns>
+		public override bool Equals(object obj)
+		{
+			return obj is Argument && this == (Argument)obj;
+		}
+
+		/// <summary>
+		/// Override the equals operator.
+		/// </summary>
+		/// <param name="a">The first argument to be compared.</param>
+		/// <param name="b">The second argument to be compared.</param>
+		/// <returns>True if the arguments are considered equal, false otherwise.</returns>
+		public static bool operator ==(Argument a, Argument b)
+		{
+			// We are equal if we have the same string and policy.
+			return a.m_policy == b.m_policy
+				&& a.m_arg == b.m_arg;
+		}
+
+		/// <summary>
+		/// Override the not-equals operator.
+		/// </summary>
+		/// <param name="a">The first argument to be compared.</param>
+		/// <param name="b">The second argument to be compared.</param>
+		/// <returns>True if the arguments are not considered equal, false otherwise.</returns>
+		public static bool operator !=(Argument a, Argument b)
+		{
+			return !(a == b);
+		}
+
+		/// <summary>
+		/// Tests whether or not two arguments are equivalent.  Arguments are considered equivalent if they result in
+		/// the same argument string once escaping has been removed.
+		/// </summary>
+		/// <param name="a">The first argument to be compared.</param>
+		/// <param name="b">The second argument to be compared.</param>
+		/// <returns>true if the Argument objects are equivalent, false otherwise.</returns>
+		public static bool IsEquivalent(Argument a, Argument b)
+		{
+			return a == b;
+		}
+
+		/// <summary>
+		/// Tests whether or not two arguments are equivalent.  Arguments are considered equivalent if they result in
+		/// the same argument string once escaping has been removed.
+		/// </summary>
+		/// <param name="other">The other argument to compare to this.</param>
+		/// <returns>true if the Argument objects are equivalent, false otherwise.</returns>
+		public bool IsEquivalent(Argument other)
+		{
+			return IsEquivalent(this, other);
+		}
+
+		// =====================================================================
+		#endregion
+
+
+		#region Object Overrides
+		// =====================================================================
 
 		/// <summary>
 		/// Override the ToString function for this type.
@@ -53,6 +140,25 @@ namespace ProcessArgumentTools
 		{
 			return m_arg;
 		}
+
+		/// <summary>
+		/// Override the GetHashCode method.
+		/// </summary>
+		/// <returns>The hash code for this argument.</returns>
+		public override int GetHashCode()
+		{
+			unchecked
+			{
+				var hash = 17;
+				hash = hash * 31 + m_arg.GetHashCode();
+				hash = hash * 31 + m_policy.GetHashCode();
+				return hash;
+			}
+		}
+
+		// =====================================================================
+		#endregion
+
 
 		#region Static Members
 		// =====================================================================
