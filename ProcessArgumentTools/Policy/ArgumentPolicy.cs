@@ -1,10 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Collections.Generic;
 
-namespace ProcessArgumentTools
+namespace ProcessArgumentTools.Policy
 {
 	/// <summary>
 	/// This is the base class for argument policies.  The argument policy dictates how the argument should be escaped.

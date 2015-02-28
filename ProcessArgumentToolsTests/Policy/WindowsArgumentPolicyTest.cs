@@ -1,6 +1,6 @@
-﻿using System;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using ProcessArgumentTools;
+using ProcessArgumentTools.Policy;
 using System.Linq;
 
 namespace ProcessArgumentToolsTests

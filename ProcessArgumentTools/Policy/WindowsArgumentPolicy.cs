@@ -2,12 +2,9 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.Contracts;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace ProcessArgumentTools
+namespace ProcessArgumentTools.Policy
 {
 	/// <summary>
 	/// The argument policy for Windows.  This escapes arguments according to the rules defined by CommandLineToArgvW.
@@ -71,6 +68,9 @@ namespace ProcessArgumentTools
 		/// <returns>A string containing a joined list of escaped arguments.</returns>
 		public override string EscapeArguments(IEnumerable<string> unescapedArgumentStrings)
 		{
+			Contract.Requires(unescapedArgumentStrings != null);
+			Contract.ForAll(unescapedArgumentStrings, s => s != null);
+
 			// Build the quoted string.
 			var result = new char[1024];
 			var resultIndex = 0;

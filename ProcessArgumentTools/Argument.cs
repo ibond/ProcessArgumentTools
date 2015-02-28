@@ -1,9 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using ProcessArgumentTools.Policy;
+using System;
 using System.Diagnostics.Contracts;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+
+// TODO: Add IOC for specifying default policy.
+// Add more code contracts.
 
 namespace ProcessArgumentTools
 {
@@ -14,7 +14,7 @@ namespace ProcessArgumentTools
 	{
 		#region Constructors and Conversions
 		// =====================================================================
-
+		
 		/// <summary>
 		/// Construct an argument from an unescaped argument string that represents a single argument.  This will use the default policy.
 		/// </summary>
@@ -41,6 +41,10 @@ namespace ProcessArgumentTools
 			m_policy = policy;
 		}
 
+		// Construct from multiple
+		// Construct pre-escaped
+		
+
 		/// <summary>
 		/// Implicit conversion operator to convert an argument to a string.
 		/// </summary>
@@ -50,6 +54,18 @@ namespace ProcessArgumentTools
 		{
 			return argument.m_arg;
 		}
+
+		// =====================================================================
+		#endregion
+
+
+		#region Properties
+		// =====================================================================
+
+		/// <summary>
+		/// Gets the argument policy for this argument.
+		/// </summary>
+		public ArgumentPolicy Policy { get { return m_policy; } }
 
 		// =====================================================================
 		#endregion
@@ -170,6 +186,7 @@ namespace ProcessArgumentTools
 		{
 			// Create the default policies for each system.
 			DefaultWindowsPolicy = new WindowsArgumentPolicy();
+			DefaultPosixPolicy = new PosixArgumentPolicy();
 						
 			// Select the appropriate policy for this system.
 			switch (Environment.OSVersion.Platform)
@@ -183,9 +200,8 @@ namespace ProcessArgumentTools
 					break;
 
 				case PlatformID.MacOSX:
-					break;
-
 				case PlatformID.Unix:
+					DefaultPolicy = DefaultPosixPolicy;
 					break;
 			}
 
@@ -203,6 +219,11 @@ namespace ProcessArgumentTools
 		/// The default argument policy for Windows.  This is provided as a convenience.
 		/// </summary>
 		public static readonly WindowsArgumentPolicy DefaultWindowsPolicy;
+
+		/// <summary>
+		/// The default argument policy for Windows.  This is provided as a convenience.
+		/// </summary>
+		public static readonly PosixArgumentPolicy DefaultPosixPolicy;
 
 		// =====================================================================
 		#endregion
