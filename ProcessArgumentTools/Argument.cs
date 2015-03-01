@@ -4,13 +4,6 @@ using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
 
-// TODO: Add IOC for specifying default policy.
-// Add more code contracts.
-// Make testing against CommandLineToArgvW optional in case that API isn't available.  Use T4 to create a template?
-// Cache the argument build buffers in a TLS variable.
-// Add code coverage settings
-// Add join arguments.
-
 namespace ProcessArgumentTools
 {
 	/// <summary>
