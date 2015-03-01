@@ -41,7 +41,7 @@
   <ItemGroup>
     <Compile Include="Argument.cs" />
     <Compile Include="Policy\ArgumentPolicy.cs" />
-    <Compile Include="Policy\PosixArgumentPolicy.cs" />
+    <Compile Include="Policy\PosixShellArgumentPolicy.cs" />
     <Compile Include="Policy\WindowsArgumentPolicy.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

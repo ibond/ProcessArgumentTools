@@ -4,15 +4,17 @@ using System.Collections.Generic;
 namespace ProcessArgumentTools.Policy
 {
 	/// <summary>
-	/// The argument policy for POSIX-compliant systems.
+	/// The argument policy for POSIX-compatible shells.
+	/// 
+	/// http://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_02 (2.2 Quoting)
 	/// </summary>
-	public class PosixArgumentPolicy : ArgumentPolicy
+	public class PosixShellArgumentPolicy : ArgumentPolicy
 	{
 		/// <summary>
 		/// Construct a PosixArgumentPolicy.  Use Argument.DefaultPosixPolicy if you need to use an instance of this
 		/// class.
 		/// </summary>
-		protected internal PosixArgumentPolicy()
+		protected internal PosixShellArgumentPolicy()
 		{
 		}
 
@@ -25,6 +27,16 @@ namespace ProcessArgumentTools.Policy
 		{
 			// TODO: Implement me.
 			return string.Join(" ", unescapedArgumentStrings);
+		}
+
+		/// <summary>
+		/// Enumerate the parsed arguments in the escaped arguments string.
+		/// </summary>
+		/// <param name="escapedArgumentString">The escaped argument string containing zero or more arguments.</param>
+		/// <returns>An enumerable containing the parsed arguments.  There will be no null strings in the enumerable.</returns>
+		public override IEnumerable<string> EnumerateParsedArguments(string escapedArgumentString)
+		{
+			throw new NotImplementedException();
 		}
 	}
 }

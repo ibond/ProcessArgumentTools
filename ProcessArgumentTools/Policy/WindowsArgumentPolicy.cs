@@ -14,7 +14,8 @@ namespace ProcessArgumentTools.Policy
 	///   completely by the command-line parser in the operating system before being passed to the argv array in the
 	///   program.
 	/// - A string surrounded by double quotation marks ("string") is interpreted as a single argument, regardless of
-	///   white space contained within. A quoted string can be embedded in an argument.
+	///   white space contained within. A quoted string can be embedded in an argument.  (ibond: there is an implicit
+	///   terminating quote at the end of the command line string.)
 	/// - A double quotation mark preceded by a backslash (\") is interpreted as a literal double quotation mark
 	///   character (").
 	/// - Backslashes are interpreted literally, unless they immediately precede a double quotation mark.
@@ -23,6 +24,9 @@ namespace ProcessArgumentTools.Policy
 	/// - If an odd number of backslashes is followed by a double quotation mark, one backslash is placed in the argv
 	///   array for every pair of backslashes, and the double quotation mark is "escaped" by the remaining backslash,
 	///   causing a literal double quotation mark (") to be placed in argv.
+	///   
+	/// ibond:
+	/// - Within a quoted string two sequential quotes add a quote and terminate the string.
 	/// 
 	/// https://msdn.microsoft.com/en-us/library/bb776391.aspx (CommandLineToArgvW function)
 	/// https://msdn.microsoft.com/en-us/library/17w5ykft.aspx (Parsing C++ Command-Line Arguments)
@@ -246,8 +250,110 @@ namespace ProcessArgumentTools.Policy
 		}
 
 		/// <summary>
-		/// These are the characters that must be escaped for Windows.
+		/// Enumerate the parsed arguments in the escaped arguments string.  The arguments are parsed in the same ways
+		/// as CommandLineToArgvW.
 		/// </summary>
-		private static readonly char[] WindowsEscapeChars = new char[] { ' ', '\t', '\n', '\v', '"' };
+		/// <param name="escapedArgumentString">The escaped argument string containing zero or more arguments.</param>
+		/// <returns>An enumerable containing the parsed arguments.  There will be no null strings in the enumerable.</returns>
+		public override IEnumerable<string> EnumerateParsedArguments(string escapedArgumentString)
+		{
+			// Create a buffer that will contain our parsed arguments.  It will never be longer than the escaped string.
+			var result = new char[escapedArgumentString.Length];
+
+			// Loop through the argument string.
+			for (int i = 0; i < escapedArgumentString.Length; ++i)
+			{
+				// Skip spaces between arguments.
+				if (!IsArgumentSeparator(escapedArgumentString[i]))
+				{
+					// If we're in a quoted string we need to keep track of when the quote starts in the result index.
+					// We set this to -1 if we're not in a quoted string.
+					int quotedStringStartResultIndex = -1;
+
+					// Keep track of consecutive backslashes.
+					int numberOfConsecutiveBackslashes = 0;
+
+					// Keep track of where we're writing to the result.
+					var resultIndex = 0;
+
+					// Continue processing in an inner loop.
+					for (; i < escapedArgumentString.Length; ++i)
+					{
+						var c = escapedArgumentString[i];
+
+						if (c == '\\')
+						{
+							// Assume this is a literal backslash for now.
+							result[resultIndex++] = '\\';
+
+							++numberOfConsecutiveBackslashes;
+						}
+						else
+						{
+							if (c == '"')
+							{
+								// The backslashes are escaping themselves, adjust the result index to remove half of the
+								// backslashes.
+								resultIndex -= numberOfConsecutiveBackslashes / 2;
+
+								// Interpret this differently based on the number of preceeding backslashes.
+								if (numberOfConsecutiveBackslashes % 2 == 0)
+								{									
+									// An even number of backslashes means the double quote is a string delimiter.  Update
+									// the start index to begin or end the quoted string.
+									if (quotedStringStartResultIndex == -1)
+									{
+										quotedStringStartResultIndex = resultIndex;
+									}
+									else
+									{
+										// Two consecutive quotes add a quote literal in addition to terminating the string.
+										if (i + 1 < escapedArgumentString.Length && escapedArgumentString[i + 1] == '"')
+										{
+											result[resultIndex++] = '"';
+											++i;
+										}
+										quotedStringStartResultIndex = -1;
+									}
+								}
+								else
+								{
+									// An odd number of backslashes means the double quote is a literal quote.  Overwrite
+									// the last backslash with the quote literal.
+									result[resultIndex - 1] = '"';
+								}
+							}
+							else if (quotedStringStartResultIndex == -1 && IsArgumentSeparator(c))
+							{
+								// We're not in a quoted string so this is the end of the argument.
+								break;
+							}
+							else 
+							{
+								// Just append the character.
+								result[resultIndex++] = c;
+							}
+
+							// Reset the number of backslashes.
+							numberOfConsecutiveBackslashes = 0;
+						}
+					}
+
+					yield return new string(result, 0, resultIndex);
+				}
+			}
+		}
+
+		/// <summary>
+		/// Checks if the character is a command line argument separator.
+		/// </summary>
+		/// <param name="value">The character to be tested.</param>
+		/// <returns>true if the character would separate command line arguments, false otherwise.</returns>
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		private static bool IsArgumentSeparator(char value)
+		{
+			return value == ' '
+				|| value == '\t';
+		}
 	}
 }

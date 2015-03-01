@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 
 namespace ProcessArgumentTools.Policy
 {
@@ -24,5 +25,23 @@ namespace ProcessArgumentTools.Policy
 		/// <param name="unescapedArgumentStrings">The enumerable of argument strings.  Each string represents a single unescaped arguments.</param>
 		/// <returns>A string containing a joined list of escaped arguments.</returns>
 		public abstract string EscapeArguments(IEnumerable<string> unescapedArgumentStrings);
+
+		/// <summary>
+		/// Parse an escaped argument string into its individual arguments.
+		/// </summary>
+		/// <param name="escapedArgumentString">The escaped argument string containing zero or more arguments.</param>
+		/// <returns>An array of arguments.</returns>
+		public virtual string[] ParseArguments(string escapedArgumentString)
+		{
+			// The default implementation of this just uses EnumerateParsedArguments and converts it to an array.
+			return EnumerateParsedArguments(escapedArgumentString).ToArray();
+		}
+
+		/// <summary>
+		/// Enumerate the parsed arguments in the escaped arguments string.
+		/// </summary>
+		/// <param name="escapedArgumentString">The escaped argument string containing zero or more arguments.</param>
+		/// <returns>An enumerable containing the parsed arguments.  There will be no null strings in the enumerable.</returns>
+		public abstract IEnumerable<string> EnumerateParsedArguments(string escapedArgumentString);
     }
 }

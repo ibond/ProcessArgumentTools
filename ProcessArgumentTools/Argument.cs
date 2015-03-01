@@ -186,7 +186,7 @@ namespace ProcessArgumentTools
 		{
 			// Create the default policies for each system.
 			DefaultWindowsPolicy = new WindowsArgumentPolicy();
-			DefaultPosixPolicy = new PosixArgumentPolicy();
+			DefaultPosixPolicy = new PosixShellArgumentPolicy();
 						
 			// Select the appropriate policy for this system.
 			switch (Environment.OSVersion.Platform)
@@ -223,7 +223,7 @@ namespace ProcessArgumentTools
 		/// <summary>
 		/// The default argument policy for Windows.  This is provided as a convenience.
 		/// </summary>
-		public static readonly PosixArgumentPolicy DefaultPosixPolicy;
+		public static readonly PosixShellArgumentPolicy DefaultPosixPolicy;
 
 		// =====================================================================
 		#endregion

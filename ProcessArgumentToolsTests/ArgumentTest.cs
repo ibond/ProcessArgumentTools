@@ -46,6 +46,7 @@ namespace ProcessArgumentToolsTests
 		{
 			Assert.IsTrue(new Argument("test").IsEquivalent(new Argument("test")));
 			Assert.IsFalse(new Argument("test").IsEquivalent(new Argument("test2")));
+
 			Assert.IsTrue(new Argument("test", Argument.DefaultPosixPolicy).IsEquivalent(new Argument("test", Argument.DefaultWindowsPolicy)));
 		}
 	}
