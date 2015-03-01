@@ -20,7 +20,7 @@ namespace ProcessArgumentToolsTests
 	}
 
 	[TestClass]
-	public class UnitTest1
+	public class WindowsArgumentPolicyTest
 	{
 		// Acquire the windows policy.
 		WindowsArgumentPolicy p = Argument.DefaultWindowsPolicy;
@@ -78,12 +78,22 @@ namespace ProcessArgumentToolsTests
 		{
 			foreach (var pair in pairs)
 			{
-				// Check that the single argument is correct.
-				Assert.AreEqual(pair.Expected, p.EscapeArgument(pair.Input));
-
-				// Check that we get the same result if this is the single argument to EscapeArguments.
-				Assert.AreEqual(pair.Expected, p.EscapeArguments(new string[] { pair.Input }));
+				TestSingleArgument(pair.Expected, pair.Input);
 			}
+		}
+
+		void TestSingleArgument(string expected, string input)
+		{
+			// Check that the single argument is correct.
+			Assert.AreEqual(expected, p.EscapeArgument(input));
+
+			// Check that we get the same result if this is the single argument to EscapeArguments.
+			Assert.AreEqual(expected, p.EscapeArguments(new string[] { input }));
+
+			// Check that we can parse the argument correctly.
+			var parsed = p.ParseArguments(expected);
+			Assert.AreEqual(1, parsed.Length);
+			Assert.AreEqual(input, parsed[0]);
 		}
 		
 		[TestMethod]
@@ -129,6 +139,13 @@ namespace ProcessArgumentToolsTests
 		{
 			Assert.AreEqual(expected, p.EscapeArguments(args));
 			Assert.AreEqual(expected, string.Join(" ", args.Select(s => p.EscapeArgument(s))));
+
+			var parsed = p.ParseArguments(expected);
+			Assert.AreEqual(args.Length, parsed.Length);
+			for (int i = 0; i < args.Length; ++i)
+			{
+				Assert.AreEqual(args[i], parsed[i]);
+			}
 		}
 
 		[TestMethod]

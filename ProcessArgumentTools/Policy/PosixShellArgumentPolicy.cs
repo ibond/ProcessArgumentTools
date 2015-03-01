@@ -53,7 +53,7 @@ namespace ProcessArgumentTools.Policy
 		{
 			Contract.Requires(unescapedArgumentStrings != null);
 			Contract.ForAll(unescapedArgumentStrings, s => s != null);
-						
+
 			// We manually enumerate the argument strings to allow us to optimize the zero element and single element
 			// cases.
 			var argsEnumerator = unescapedArgumentStrings.GetEnumerator();
@@ -66,8 +66,8 @@ namespace ProcessArgumentTools.Policy
 				// Get the first argument and move to the next one.  This lets us see if there is only one argument and
 				// if so we use the single argument escape function.
 				var argument = argsEnumerator.Current;
-				var hasArgument = argsEnumerator.MoveNext();
-				if (!hasArgument)
+				var hasArgumentsRemaining = argsEnumerator.MoveNext();
+				if (!hasArgumentsRemaining)
 					return EscapeArgument(argument);
 
 
@@ -75,7 +75,7 @@ namespace ProcessArgumentTools.Policy
 				var result = new char[1024];
 				var resultIndex = 0;
 
-				for(;;)
+				for (; ; )
 				{
 					Debug.Assert(resultIndex < result.Length);
 
@@ -85,7 +85,7 @@ namespace ProcessArgumentTools.Policy
 
 					// Test if this argument requires escaping.
 					var requiresEscaping = RequiresArgumentEscaping(argument);
-				
+
 					// Calculate the maximum possible length for the escaped argument.  An argument that doesn't need to
 					// be escaped will be copied directly, otherwise it's possible that every character in the argument
 					// must be escaped.  Add 1 more for the argument separator space that may follow this argument.
@@ -113,13 +113,14 @@ namespace ProcessArgumentTools.Policy
 						// There are characters that require escaping.
 						resultIndex = CopyArgumentEscaped(result, resultIndex, argument);
 					}
-
-					// Move to the next argument.
-					hasArgument = argsEnumerator.MoveNext();
-					if (!hasArgument)
+					
+					// We're done when there are no more arguments remaining.
+					if (!hasArgumentsRemaining)
 						break;
 
+					// The enumerator is currently at the next argument, get it and move.
 					argument = argsEnumerator.Current;
+					hasArgumentsRemaining = argsEnumerator.MoveNext();
 				}
 
 				// The string will always start with a space because of how we join arguments so we make sure not to include
@@ -158,15 +159,15 @@ namespace ProcessArgumentTools.Policy
 					}
 					else
 					{
-						// Open the quoted string.
+						// Open the quoted string and write the character.
 						result[resultIndex++] = '\'';
+						result[resultIndex++] = argument[i];
 
-						// Write characters until we reach another quote literal.
-						do
+						// Continue writing characters until we reach another quote literal.
+						for (; (i + 1) < argument.Length && argument[i + 1] != '\''; ++i)
 						{
-							result[resultIndex++] = argument[i];
-							++i;
-						} while (i < argument.Length && argument[i] != '\'');
+							result[resultIndex++] = argument[i + 1];
+						}
 
 						// Close the quoted string.
 						result[resultIndex++] = '\'';
@@ -221,7 +222,7 @@ namespace ProcessArgumentTools.Policy
 				var indexBit = 1UL << value;
 				return (indexBit & 0xf80007fd00000600) != 0;
 			}
-			else if(value < 128)
+			else if (value < 128)
 			{
 				var indexBit = 1UL << (value - 64);
 				return (indexBit & 0x5000000118000000) != 0;
@@ -245,17 +246,126 @@ namespace ProcessArgumentTools.Policy
 			//
 			// This means that up to half of the characters rounded up can require three characters, and the
 			// other half can require two characters.
-			return (((unescapedLength + 1) / 2) * 3) + unescapedLength;
+			//
+			// Zero-length strings are represented as ''.
+			return unescapedLength != 0
+				? (((unescapedLength + 1) / 2) * 3) + unescapedLength
+				: 2;
 		}
 
 		/// <summary>
-		/// Enumerate the parsed arguments in the escaped arguments string.
+		/// Enumerate the parsed arguments in the escaped arguments string.  This will simply unescape characters, it
+		/// will not do any sort of shell expansion so it does not necessarily give the same results as the shell.
+		/// 
+		/// There are a few other differences:
+		/// - A trailing backslash is simply ignored instead of being considered an error.
+		/// - An implicit closing quote is added to the end of the string if a quoted string is left open instead of
+		///   being considered an error.
 		/// </summary>
 		/// <param name="escapedArgumentString">The escaped argument string containing zero or more arguments.</param>
 		/// <returns>An enumerable containing the parsed arguments.  There will be no null strings in the enumerable.</returns>
 		public override IEnumerable<string> EnumerateParsedArguments(string escapedArgumentString)
 		{
-			throw new NotImplementedException();
+			// Create a buffer that will contain our parsed arguments.  It will never be longer than the escaped string.
+			var result = new char[escapedArgumentString.Length];
+
+			// Loop through the argument string.
+			for (int i = 0; i < escapedArgumentString.Length; ++i)
+			{
+				// Skip spaces between arguments.
+				if (!IsArgumentSeparator(escapedArgumentString[i]))
+				{
+					// Keep track of where we're writing to the result.
+					var resultIndex = 0;
+
+					// Start by reading any unquoted arguments.
+					for (; i < escapedArgumentString.Length; ++i)
+					{
+						var c = escapedArgumentString[i];
+
+						if (c == '\\')
+						{
+							// If this is the end of the string we just ignore the backslash.
+							if (++i < escapedArgumentString.Length)
+							{
+								// A newline signifies a line continuation in which case we will just skip the newline
+								// character.  All other characters are added as literals.
+								if (escapedArgumentString[i] != '\n')
+									result[resultIndex++] = escapedArgumentString[i];
+							}
+						}
+						else if (c == '\'')
+						{
+							// This is the beginning of a single quoted string.  Add all characters as literals until we
+							// reach the next single quote.
+							for (++i; i < escapedArgumentString.Length && escapedArgumentString[i] != '\''; ++i)
+							{
+								result[resultIndex++] = escapedArgumentString[i];
+							}
+						}
+						else if (c == '"')
+						{
+							// This is the beginning of a double quoted string.
+							for (++i; i < escapedArgumentString.Length && escapedArgumentString[i] != '"'; ++i)
+							{
+								if (escapedArgumentString[i] == '\\')
+								{
+									// This is a literal unless it is followed by a double quote escapeable character.
+									if (++i < escapedArgumentString.Length && CanBeEscapedInDoubleQuotedString(escapedArgumentString[i]))
+										result[resultIndex++] = escapedArgumentString[i];
+									else
+										result[resultIndex++] = '\\';
+								}
+								else
+								{
+									// A literal.
+									result[resultIndex++] = escapedArgumentString[i];
+								}
+							}
+						}
+						else if (IsArgumentSeparator(c))
+						{
+							// This is outside of a quoted string so we end the argument.
+							break;
+						}
+						else
+						{
+							// This is just a literal character.
+							result[resultIndex++] = c;
+						}
+					}
+
+					yield return new string(result, 0, resultIndex);
+				}
+			}
+		}
+
+		/// <summary>
+		/// Checks if the character is a command line argument separator.
+		/// </summary>
+		/// <param name="value">The character to be tested.</param>
+		/// <returns>true if the character would separate command line arguments, false otherwise.</returns>
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		private static bool IsArgumentSeparator(char value)
+		{
+			return value == ' '
+				|| value == '\t'
+				|| value == '\n';
+		}
+
+		/// <summary>
+		/// Checks if the character is a special character that can be escaped in a double quoted string.
+		/// </summary>
+		/// <param name="value">The character to be tested.</param>
+		/// <returns>true if the character can be escaped in a double quoted string, false otherwise.</returns>
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		private static bool CanBeEscapedInDoubleQuotedString(char value)
+		{
+			return value == '$'
+				|| value == '`'
+				|| value == '"'
+				|| value == '\\'
+				|| value == '\n';
 		}
 	}
 }
