@@ -2,14 +2,14 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
+using System.Linq;
 
 // TODO: Add IOC for specifying default policy.
 // Add more code contracts.
-// Implement equivalence.
 // Make testing against CommandLineToArgvW optional in case that API isn't available.  Use T4 to create a template?
 // Cache the argument build buffers in a TLS variable.
 // Add code coverage settings
-// Add construction from Argument.
+// Add join arguments.
 
 namespace ProcessArgumentTools
 {
@@ -30,12 +30,13 @@ namespace ProcessArgumentTools
 		PreEscaped = 1
 	}
 
+
 	/// <summary>
 	/// This class represents an escaped command line argument or arguments.
 	/// </summary>
 	public struct Argument : IEquatable<Argument>
 	{
-		#region Constructors and Conversions
+		#region String Constructors
 		// =====================================================================
 		
 		/// <summary>
@@ -54,7 +55,7 @@ namespace ProcessArgumentTools
 		/// </summary>
 		/// <param name="argumentString">The argument string.  This will be escaped to become a single argument.</param>
 		/// <param name="flags">The argument flags used to create this Argument.</param>
-		public Argument(string argumentString, ArgumentFlags flags)
+		public Argument(ArgumentFlags flags, string argumentString)
 			: this(flags, DefaultPolicy, argumentString)
 		{
 		}
@@ -65,7 +66,7 @@ namespace ProcessArgumentTools
 		/// </summary>
 		/// <param name="unescapedArgumentString">The argument string.  This will be escaped to become a single argument.</param>
 		/// <param name="policy">The argument policy to be used for this argument.</param>
-		public Argument(string unescapedArgumentString, ArgumentPolicy policy)
+		public Argument(ArgumentPolicy policy, string unescapedArgumentString)
 			: this(ArgumentFlags.None, policy, unescapedArgumentString)
 		{
 		}
@@ -141,7 +142,7 @@ namespace ProcessArgumentTools
 
 			// Don't escape a pre-escaped argument.
 			m_arg = flags.HasFlag(ArgumentFlags.PreEscaped)
-				? policy.JoinArguments(argumentStrings)
+				? policy.JoinEscapedArguments(argumentStrings)
 				: policy.EscapeArguments(argumentStrings);
 			m_policy = policy;
 		}
@@ -186,27 +187,68 @@ namespace ProcessArgumentTools
 		{
 		}
 
-		/// <summary>
-		/// Implicit conversion operator to convert an argument to a string.
-		/// </summary>
-		/// <param name="path">The argument to be converted.</param>
-		/// <returns>The argument in string form.</returns>
-		public static implicit operator string(Argument argument)
-		{
-			return argument.m_arg;
-		}
-
 		// =====================================================================
 		#endregion
 
 
-		#region Properties
+		#region Argument Constructors
+		// =====================================================================
+
+		/// <summary>
+		/// Copy construct an argument.
+		/// </summary>
+		/// <param name="argument">The existing argument.</param>
+		public Argument(Argument argument)
+		{
+			m_arg = argument.m_arg;
+			m_policy = argument.m_policy;
+		}
+
+		/// <summary>
+		/// Construct an argument from an existing argument using a different policy.
+		/// </summary>
+		/// <param name="argument">The existing argument.</param>
+		/// <param name="policy">The argument policy to be used for this argument.</param>
+		public Argument(ArgumentPolicy policy, Argument argument)
+		{
+			Contract.Requires(policy != null);
+
+			// If we can't accept the argument directly we need to parse then re-escape it.
+			m_arg = policy.AcceptsArgumentsFrom(argument.m_policy)
+				? argument.m_arg
+				: policy.EscapeArguments(argument.EnumerateUnescaped());
+			m_policy = policy;
+		}
+
+		// =====================================================================
+		#endregion
+		
+
+		#region Properties and Accessors
 		// =====================================================================
 
 		/// <summary>
 		/// Gets the argument policy for this argument.
 		/// </summary>
 		public ArgumentPolicy Policy { get { return m_policy; } }
+
+		/// <summary>
+		/// Get the unescaped list of arguments.
+		/// </summary>
+		/// <returns>A string array containing the unescaped list of arguments.</returns>
+		public string[] GetUnescaped()
+		{
+			return m_policy.ParseArguments(m_arg);
+		}
+
+		/// <summary>
+		/// Enumerate the unescaped list of arguments.
+		/// </summary>
+		/// <returns>An IEnumerable containing the unescaped list of arguments.</returns>
+		public IEnumerable<string> EnumerateUnescaped()
+		{
+			return m_policy.EnumerateParsedArguments(m_arg);
+		}
 
 		// =====================================================================
 		#endregion
@@ -268,7 +310,15 @@ namespace ProcessArgumentTools
 		/// <returns>true if the Argument objects are equivalent, false otherwise.</returns>
 		public static bool IsEquivalent(Argument a, Argument b)
 		{
-			return a == b;
+			// If these are equal then there's no need to compare further.
+			if (a == b)
+				return true;
+
+			// They're not equal, compare their unescaped argument strings.
+			var aEnumerable = a.EnumerateUnescaped();
+			var bEnumerable = b.EnumerateUnescaped();
+
+			return aEnumerable.SequenceEqual(bEnumerable);
 		}
 
 		/// <summary>
@@ -280,6 +330,144 @@ namespace ProcessArgumentTools
 		public bool IsEquivalent(Argument other)
 		{
 			return IsEquivalent(this, other);
+		}
+
+		// =====================================================================
+		#endregion
+
+
+		#region Argument Manipulation
+		// =====================================================================
+
+		/// <summary>
+		/// Append an additional argument to this argument using this Argument policy.  Returns a new Argument
+		/// structure, this Argument structure is unchanged.
+		/// </summary>
+		/// <param name="flags">The argument flags used to append the new arguments.</param>
+		/// <param name="argumentString">A single unescaped argument.</param>
+		/// <returns>A new Argument structure containing the appended arguments.</returns>
+		public Argument Append(ArgumentFlags flags, string argumentString)
+		{
+			var newArgString = flags.HasFlag(ArgumentFlags.PreEscaped)
+				? m_policy.JoinEscapedArguments(new string[] { m_arg, argumentString })
+				: m_policy.AppendUnescaped(m_arg, argumentString);
+
+			return new Argument(ArgumentFlags.PreEscaped, m_policy, newArgString);
+		}
+
+		/// <summary>
+		/// Append additional arguments to this argument using this Argument policy.  Returns a new Argument structure,
+		/// this Argument structure is unchanged.
+		/// </summary>
+		/// <param name="flags">The argument flags used to append the new arguments.</param>
+		/// <param name="argumentStrings">An enumeration of unescaped arguments.</param>
+		/// <returns>A new Argument structure containing the appended arguments.</returns>
+		public Argument Append(ArgumentFlags flags, IEnumerable<string> argumentStrings)
+		{		
+			if(flags.HasFlag(ArgumentFlags.PreEscaped))
+			{
+				var stringList = new List<string>() { m_arg };
+				stringList.AddRange(argumentStrings);
+				
+				return new Argument(ArgumentFlags.PreEscaped, m_policy, m_policy.JoinEscapedArguments(stringList));
+			}
+			else
+			{
+				return new Argument(ArgumentFlags.PreEscaped, m_policy, m_policy.AppendUnescaped(m_arg, argumentStrings));
+			}			
+		}
+
+		/// <summary>
+		/// Append additional arguments to this argument using this Argument policy.  Returns a new Argument structure,
+		/// this Argument structure is unchanged.
+		/// </summary>
+		/// <param name="flags">The argument flags used to append the new arguments.</param>
+		/// <param name="argumentStrings">A params of unescaped arguments.</param>
+		/// <returns>A new Argument structure containing the appended arguments.</returns>
+		public Argument Append(ArgumentFlags flags, params string[] argumentStrings)
+		{
+			return Append(flags, (IEnumerable<string>)argumentStrings);
+		}
+
+		/// <summary>
+		/// Append an additional argument to this argument using this Argument policy.  Returns a new Argument
+		/// structure, this Argument structure is unchanged.
+		/// </summary>
+		/// <param name="unescapedArgumentString">A single unescaped argument.</param>
+		/// <returns>A new Argument structure containing the appended arguments.</returns>
+		public Argument Append(string unescapedArgumentString)
+		{
+			return Append(ArgumentFlags.None, unescapedArgumentString);
+		}
+
+		/// <summary>
+		/// Append additional arguments to this argument using this Argument policy.  Returns a new Argument structure,
+		/// this Argument structure is unchanged.
+		/// </summary>
+		/// <param name="unescapedArgumentStrings">An enumeration of unescaped arguments.</param>
+		/// <returns>A new Argument structure containing the appended arguments.</returns>
+		public Argument Append(IEnumerable<string> unescapedArgumentStrings)
+		{
+			return Append(ArgumentFlags.None, unescapedArgumentStrings);
+		}
+
+		/// <summary>
+		/// Append additional arguments to this argument using this Argument policy.  Returns a new Argument structure,
+		/// this Argument structure is unchanged.
+		/// </summary>
+		/// <param name="unescapedArgumentStrings">A params of unescaped arguments.</param>
+		/// <returns>A new Argument structure containing the appended arguments.</returns>
+		public Argument Append(params string[] unescapedArgumentStrings)
+		{
+			return Append(ArgumentFlags.None, (IEnumerable<string>)unescapedArgumentStrings);
+		}
+
+		/// <summary>
+		/// Append an additional argument to this argument using this Argument policy.  Returns a new Argument
+		/// structure, this Argument structure is unchanged.
+		/// </summary>
+		/// <param name="argument">A single existing Argument.</param>
+		/// <returns>A new Argument structure containing the appended arguments.</returns>
+		public Argument Append(Argument argument)
+		{
+			// If we can't accept the argument directly we need to parse then re-escape it.
+			return Append(
+				ArgumentFlags.PreEscaped,
+				m_policy.AcceptsArgumentsFrom(argument.m_policy)
+					? argument.m_arg
+					: m_policy.EscapeArguments(argument.EnumerateUnescaped()));
+		}
+
+		/// <summary>
+		/// Append additional arguments to this argument using this Argument policy.  Returns a new Argument structure,
+		/// this Argument structure is unchanged.
+		/// </summary>
+		/// <param name="arguments">An enumeration of existing arguments.</param>
+		/// <returns>A new Argument structure containing the appended arguments.</returns>
+		public Argument Append(IEnumerable<Argument> arguments)
+		{
+			Contract.Requires(arguments != null);
+
+			// Normalize each of the arguments depending on whether we can accept it's argument directly.
+			var thisPolicy = m_policy;
+			var normalizedArguments = arguments.Select(
+				arg => thisPolicy.AcceptsArgumentsFrom(arg.m_policy)
+					? arg.m_arg
+					: thisPolicy.EscapeArguments(arg.EnumerateUnescaped()));
+
+			// If we can't accept the argument directly we need to parse then re-escape it.
+			return Append(ArgumentFlags.PreEscaped, normalizedArguments);
+		}
+
+		/// <summary>
+		/// Append additional arguments to this argument using this Argument policy.  Returns a new Argument structure,
+		/// this Argument structure is unchanged.
+		/// </summary>
+		/// <param name="arguments">A params of existing arguments.</param>
+		/// <returns>A new Argument structure containing the appended arguments.</returns>
+		public Argument Append(params Argument[] arguments)
+		{
+			return Append((IEnumerable<Argument>)arguments);
 		}
 
 		// =====================================================================

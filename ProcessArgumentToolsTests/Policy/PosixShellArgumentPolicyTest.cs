@@ -90,7 +90,7 @@ namespace ProcessArgumentToolsTests.Policy
 		[TestMethod]
 		public void TestJoinArgs()
 		{
-			Assert.AreEqual(@"a b c", p.JoinArguments(new string[] { @"a", @"b", @"c" }));
+			Assert.AreEqual(@"a b c", p.JoinEscapedArguments(new string[] { @"a", @"b", @"c" }));
 		}
 
 		[TestMethod]
