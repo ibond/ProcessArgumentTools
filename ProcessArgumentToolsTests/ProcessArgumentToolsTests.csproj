@@ -50,6 +50,7 @@
     </Otherwise>
   </Choose>
   <ItemGroup>
+    <Compile Include="Policy\PosixShellArgumentPolicyTest.cs" />
     <Compile Include="Policy\WindowsArgumentPolicyTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ArgumentTest.cs" />

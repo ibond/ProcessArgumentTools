@@ -57,8 +57,6 @@ namespace ProcessArgumentToolsTests
 				{
 					new TestPair(" ", "\" \""),
 					new TestPair("\t", "\"\t\""),
-					new TestPair("\n", "\"\n\""),
-					new TestPair("\v", "\"\v\""),
 					new TestPair("\"", "\"\\\"\"")
 				});
 		}
@@ -119,6 +117,12 @@ namespace ProcessArgumentToolsTests
 			var strings = new string[] { new string('x', 5000), new string(' ', 5000), new string('"', 5000) };
 			var expected = strings[0] + " " + "\"" + strings[1] + "\"" + " " + "\"" + string.Join("", strings[2].AsEnumerable().Select(c => "\\" + c)) + "\"";
 			TestMultipleArguments(expected, strings);
+
+			for (int i = 0; i < 5000; ++i)
+			{
+				var args = new string('x', i).AsEnumerable().Select(c => c.ToString()).ToArray();
+				TestMultipleArguments(string.Join(" ", args), args);
+			}
 		}
 
 		void TestMultipleArguments(string expected, string[] args)
@@ -133,6 +137,14 @@ namespace ProcessArgumentToolsTests
 			TestParseArgs("");
 			TestParseArgs("a");
 			TestParseArgs("a b c");
+		}
+
+		[TestMethod]
+		public void TestParsingWhitespace()
+		{
+			TestParseArgs("\vx\vx\v");
+			TestParseArgs("\nx\nx\n");
+			TestParseArgs("\tx\tx\t");
 		}
 
 		[TestMethod]
@@ -173,6 +185,9 @@ namespace ProcessArgumentToolsTests
 				TestParseArgs("x" + quoteString);
 				TestParseArgs("x " + quoteString);
 				TestParseArgs(quoteString + "xyz" + quoteString);
+				TestParseArgs(quoteString + "\\\"" + quoteString);
+				TestParseArgs(quoteString + "\\\" " + quoteString);
+				TestParseArgs(quoteString + " \\\" " + quoteString);
 
 				TestParseArgs("test some \"quoted arguments \\\\" + quoteString + "\\\\\" args");
 			}

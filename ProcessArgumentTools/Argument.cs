@@ -4,6 +4,10 @@ using System.Diagnostics.Contracts;
 
 // TODO: Add IOC for specifying default policy.
 // Add more code contracts.
+// Implement equivalence.
+// Make testing against optional in case that API isn't available.  Use T4 to create a template?
+// Add argument joining.
+// Cache the argument build buffers in a TLS variable.
 
 namespace ProcessArgumentTools
 {

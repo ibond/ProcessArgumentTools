@@ -25,13 +25,20 @@ namespace ProcessArgumentTools.Policy
 	///   array for every pair of backslashes, and the double quotation mark is "escaped" by the remaining backslash,
 	///   causing a literal double quotation mark (") to be placed in argv.
 	///   
-	/// ibond:
-	/// - Within a quoted string two sequential quotes add a quote and terminate the string.
+	/// ibond: Undocumented behavior of CommandLineToArgvW:
+	/// - Within a quoted string two sequential non-literal quotes add a quote and terminate the string.
 	/// 
 	/// https://msdn.microsoft.com/en-us/library/bb776391.aspx (CommandLineToArgvW function)
 	/// https://msdn.microsoft.com/en-us/library/17w5ykft.aspx (Parsing C++ Command-Line Arguments)
 	/// 
 	/// http://blogs.msdn.com/b/twistylittlepassagesallalike/archive/2011/04/23/everyone-quotes-arguments-the-wrong-way.aspx
+	/// 
+	/// We differ from CommandLineToArgvW in the following way:
+	/// - CommandLineToArgvW assumes that the first argument always exists and is a program path and parses that
+	///   differently from the remaining arguments since it can assume the content of an argument is a file path.  This
+	///   policy just assumes that we have an arbitrary set of zero or more arguments that may be a subset of a larger
+	///   set of arguments and doesn't handle the first argument in any special way.
+	/// - This class does not treat '\0' as a special character and will allow it to be embedded in arguments.
 	/// </summary>
 	public class WindowsArgumentPolicy : ArgumentPolicy
 	{
@@ -57,9 +64,8 @@ namespace ProcessArgumentTools.Policy
 
 			// Escape the argument.
 			var result = new char[(unescapedArgumentString.Length * 2) + 2];
-			var resultIndex = 0;
 
-			resultIndex = CopyArgumentEscaped(result, resultIndex, unescapedArgumentString);
+			var resultIndex = CopyArgumentEscaped(result, 0, unescapedArgumentString);
 
 			return new string(result, 0, resultIndex);
 		}
@@ -68,51 +74,94 @@ namespace ProcessArgumentTools.Policy
 		/// Escape arguments according to the specifications of CommandLineToArgvW and combine the results separated by
 		/// spaces.
 		/// </summary>
-		/// <param name="unescapedArgumentStrings">The enumerable of argument strings.  Each string represents a single unescaped arguments.</param>
+		/// <param name="unescapedArgumentStrings">
+		/// The enumerable of argument strings.  Each string represents a single unescaped argument.  This will only be
+		/// enumerated once.
+		/// </param>
 		/// <returns>A string containing a joined list of escaped arguments.</returns>
 		public override string EscapeArguments(IEnumerable<string> unescapedArgumentStrings)
 		{
 			Contract.Requires(unescapedArgumentStrings != null);
 			Contract.ForAll(unescapedArgumentStrings, s => s != null);
-
-			// Build the quoted string.
-			var result = new char[1024];
-			var resultIndex = 0;
-
-			// Add each argument.
-			foreach (var argument in unescapedArgumentStrings)
+						
+			// We manually enumerate the argument strings to allow us to optimize the zero element and single element
+			// cases.
+			var argsEnumerator = unescapedArgumentStrings.GetEnumerator();
+			try
 			{
-				Debug.Assert(resultIndex != result.Length);
+				// Handle zero arguments.
+				if (!argsEnumerator.MoveNext())
+					return String.Empty;
 
-				// Separate each argument with a space.  The first space will be removed when constructing the returned
-				// string.
-				result[resultIndex++] = ' ';
-				
-				// Calculate the maximum possible length for the escaped argument.   It's possible that every character
-				// in the argument must be escaped plus the surrounding quotes.  Add 1 more for the space between
-				// arguments.
-				var maxEscapedArgLength = (argument.Length * 2) + 2 + 1;
-				var requiredBufferLength = resultIndex + maxEscapedArgLength;
-				if (requiredBufferLength > result.Length)
-					Array.Resize(ref result, requiredBufferLength * 2);
-				
-				// Start by assuming that we don't need to escape anything and just copy the characters over.				
-				var unescapedCopyResult = TryCopyArgumentUnescaped(result, resultIndex, argument);
-				if (!unescapedCopyResult)
+				// Get the first argument and move to the next one.  This lets us see if there is only one argument and
+				// if so we use the single argument escape function.
+				var argument = argsEnumerator.Current;
+				var hasArgumentsRemaining = argsEnumerator.MoveNext();
+				if (!hasArgumentsRemaining)
+					return EscapeArgument(argument);
+
+
+				// There is more than one argument, start building the final argument string.
+				var result = new char[1024];
+				var resultIndex = 0;
+
+				for(;;)
 				{
-					// There are characters that require escaping.
-					resultIndex = CopyArgumentEscaped(result, resultIndex, argument);
+					Debug.Assert(resultIndex < result.Length);
+
+					// Separate each argument with a space.  The first space will be removed when constructing the returned
+					// string.
+					result[resultIndex++] = ' ';
+
+					// Test if this argument requires escaping.
+					var requiresEscaping = RequiresArgumentEscaping(argument);
+				
+					// Calculate the maximum possible length for the escaped argument.  An argument that doesn't need to be
+					// escaped will be copied directly, otherwise it's possible that every character in the argument must be
+					// escaped plus the surrounding quotes.  Add 1 more for the space between arguments that may follow this
+					// argument.
+					var maxEscapedArgLength = requiresEscaping
+						? ((argument.Length * 2) + 2 + 1)
+						: (argument.Length + 1);
+
+					// Resize the buffer if necessary.
+					var requiredBufferLength = resultIndex + maxEscapedArgLength;
+					if (requiredBufferLength > result.Length)
+					{
+						var newResult = new char[requiredBufferLength * 2];
+						Array.Copy(result, newResult, resultIndex);
+						result = newResult;
+					}
+
+					// If we don't require escaping we just copy the characters over directly.
+					if (!requiresEscaping)
+					{
+						argument.CopyTo(0, result, resultIndex, argument.Length);
+						resultIndex += argument.Length;
+					}
+					else
+					{
+						// There are characters that require escaping.
+						resultIndex = CopyArgumentEscaped(result, resultIndex, argument);
+					}
+
+					// We're done when there are no more arguments remaining.
+					if (!hasArgumentsRemaining)
+						break;
+
+					// The enumerator is currently at the next argument, get it and move.
+					argument = argsEnumerator.Current;
+					hasArgumentsRemaining = argsEnumerator.MoveNext();
 				}
-				else
-				{
-					// No escaping was necessary, advance the result index.
-					resultIndex += argument.Length;
-				}
+
+				// The string will always start with a space because of how we join arguments so we make sure not to include
+				// that space here.
+				return new string(result, 1, resultIndex - 1);
 			}
-
-			// The string will always start with a space because of how we join arguments so we make sure not to include
-			// that space here.
-			return new string(result, 1, resultIndex - 1);
+			finally
+			{
+				argsEnumerator.Dispose();
+			}
 		}
 
 		/// <summary>
@@ -178,40 +227,6 @@ namespace ProcessArgumentTools.Policy
 		}
 		
 		/// <summary>
-		/// Try to copy the argument to the result buffer without escaping.
-		/// </summary>
-		/// <param name="result">The result buffer.  This must be long enough to contain the entire argument string.  May not be null.</param>
-		/// <param name="resultIndex">The index in the result buffer where the argument should be copied.</param>
-		/// <param name="argument">The argument string.  May not be null.</param>
-		/// <returns>true if the argument could be copied without any escaping, false if there were characters that require escaping.</returns>
-		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		private static bool TryCopyArgumentUnescaped(char[] result, int resultIndex, string argument)
-		{
-			Contract.Requires(result != null);
-			Contract.Requires(result.Length >= resultIndex + argument.Length);
-			Contract.Requires(argument != null);
-
-			// Empty string arguments must be escaped.
-			if (argument.Length == 0)
-				return false;
-
-			for (int i = 0; i < argument.Length; ++i)
-			{
-				var c = argument[i];
-
-				// Check if this character requires the argument to be escaped.  If so we just return the initial result
-				// index.
-				if (RequiresArgumentEscaping(c))
-					return false;
-
-				// Just copy the character over.
-				result[resultIndex++] = c;
-			}
-
-			return true;
-		}
-
-		/// <summary>
 		/// Check if the given argument requires escaping.
 		/// </summary>
 		/// <param name="argument">The argument string.  May not be null.</param>
@@ -221,17 +236,14 @@ namespace ProcessArgumentTools.Policy
 		{
 			Contract.Requires(argument != null);
 
-			// Empty string arguments must be escaped.
-			if (argument.Length == 0)
-				return true;
-
 			for (int i = 0; i < argument.Length; ++i)
 			{
 				if (RequiresArgumentEscaping(argument[i]))
 					return true;
 			}
 
-			return false;
+			// Empty string arguments must be escaped.
+			return argument.Length == 0;
 		}
 
 		/// <summary>
@@ -244,9 +256,7 @@ namespace ProcessArgumentTools.Policy
 		{
 			return value == ' '
 				|| value == '"'
-				|| value == '\t'
-				|| value == '\n'
-				|| value == '\v';
+				|| value == '\t';
 		}
 
 		/// <summary>
