@@ -88,6 +88,12 @@ namespace ProcessArgumentToolsTests.Policy
 		}
 
 		[TestMethod]
+		public void TestJoinArgs()
+		{
+			Assert.AreEqual(@"a b c", p.JoinArguments(new string[] { @"a", @"b", @"c" }));
+		}
+
+		[TestMethod]
 		public void TestEmptyArgs()
 		{
 			TestMultipleArguments(@"'' '' ''", new string[] { @"", @"", @"" });
@@ -142,6 +148,8 @@ namespace ProcessArgumentToolsTests.Policy
 			TestParseArgs(new string[] { "abc", "def" }, "abc \"def\"");
 			TestParseArgs(new string[] { "", "", "abc", "def" }, "'' '' abc 'def'");
 			TestParseArgs(new string[] { "abc", "defdef''def\"def" }, @"abc ""def""'def'''\'\''''def""'""def""");
+			TestParseArgs(new string[] { "test" }, "test     ");
+			TestParseArgs(new string[] { }, "");
 		}
 
 		public void TestParseArgs(string[] expected, string input)

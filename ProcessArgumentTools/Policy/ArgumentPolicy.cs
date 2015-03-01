@@ -22,9 +22,20 @@ namespace ProcessArgumentTools.Policy
 		/// <summary>
 		/// Escape an enumerable of arguments returning a single string containing all escaped arguments.
 		/// </summary>
-		/// <param name="unescapedArgumentStrings">The enumerable of argument strings.  Each string represents a single unescaped arguments.</param>
+		/// <param name="unescapedArgumentStrings">The enumerable of argument strings.  Each string represents a single unescaped argument.</param>
 		/// <returns>A string containing a joined list of escaped arguments.</returns>
 		public abstract string EscapeArguments(IEnumerable<string> unescapedArgumentStrings);
+
+		/// <summary>
+		/// Join a list of escaped argument strings into a single argument string.
+		/// </summary>
+		/// <param name="escapedArgumentStrings">The enumerable of argument strings.  Each string represents a single escaped argument.</param>
+		/// <returns>A string containing a joined list of escaped arguments.</returns>
+		public virtual string JoinArguments(IEnumerable<string> escapedArgumentStrings)
+		{
+			// Just do a standard string.Join with a space by default.
+			return string.Join(" ", escapedArgumentStrings);
+		}
 
 		/// <summary>
 		/// Parse an escaped argument string into its individual arguments.

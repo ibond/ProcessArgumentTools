@@ -1,16 +1,35 @@
 ﻿using ProcessArgumentTools.Policy;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 
 // TODO: Add IOC for specifying default policy.
 // Add more code contracts.
 // Implement equivalence.
-// Make testing against optional in case that API isn't available.  Use T4 to create a template?
-// Add argument joining.
+// Make testing against CommandLineToArgvW optional in case that API isn't available.  Use T4 to create a template?
 // Cache the argument build buffers in a TLS variable.
+// Add code coverage settings
+// Add construction from Argument.
 
 namespace ProcessArgumentTools
 {
+	/// <summary>
+	/// Options that can be used when constructing an Argument.
+	/// </summary>
+	[Flags]
+	public enum ArgumentFlags
+	{
+		/// <summary>
+		/// No flags specified.
+		/// </summary>
+		None = 0,
+
+		/// <summary>
+		/// The argument string is pre-escaped and does not need to be modified.
+		/// </summary>
+		PreEscaped = 1
+	}
+
 	/// <summary>
 	/// This class represents an escaped command line argument or arguments.
 	/// </summary>
@@ -20,11 +39,23 @@ namespace ProcessArgumentTools
 		// =====================================================================
 		
 		/// <summary>
-		/// Construct an argument from an unescaped argument string that represents a single argument.  This will use the default policy.
+		/// Construct an argument from an unescaped argument string that represents a single argument.  This will use
+		/// the default policy.
 		/// </summary>
-		/// <param name="unescapedArgument">The argument string.  This will be escaped to become a single argument.</param>
+		/// <param name="unescapedArgumentString">The argument string.  This will be escaped to become a single argument.</param>
 		public Argument(string unescapedArgumentString)
-			: this(unescapedArgumentString, DefaultPolicy)
+			: this(ArgumentFlags.None, DefaultPolicy, unescapedArgumentString)
+		{
+		}
+
+		/// <summary>
+		/// Construct an argument from an argument string that represents a single argument.  This will use
+		/// the default policy and will be based on the given flags.
+		/// </summary>
+		/// <param name="argumentString">The argument string.  This will be escaped to become a single argument.</param>
+		/// <param name="flags">The argument flags used to create this Argument.</param>
+		public Argument(string argumentString, ArgumentFlags flags)
+			: this(flags, DefaultPolicy, argumentString)
 		{
 		}
 		
@@ -32,22 +63,128 @@ namespace ProcessArgumentTools
 		/// Construct an argument from an unescaped argument string that represents a single argument.  The argument
 		/// will be escaped using the given policy.
 		/// </summary>
-		/// <param name="unescapedArgument">The argument string.  This will be escaped to become a single argument.</param>
+		/// <param name="unescapedArgumentString">The argument string.  This will be escaped to become a single argument.</param>
 		/// <param name="policy">The argument policy to be used for this argument.</param>
 		public Argument(string unescapedArgumentString, ArgumentPolicy policy)
+			: this(ArgumentFlags.None, policy, unescapedArgumentString)
 		{
-			Contract.Requires(unescapedArgumentString != null);
+		}
+		
+		/// <summary>
+		/// Construct an argument from an argument string that represents a single argument.  The argument will be
+		/// escaped using the given policy based on the given flags.
+		/// </summary>
+		/// <param name="argumentString">The argument string.  This will be escaped to become a single argument.</param>
+		/// <param name="policy">The argument policy to be used for this argument.</param>
+		/// <param name="flags">The argument flags used to create this Argument.</param>
+		public Argument(ArgumentFlags flags, ArgumentPolicy policy, string argumentString)
+		{
+			Contract.Requires(argumentString != null);
+			Contract.Requires(policy != null);
+			Contract.Ensures(this.m_arg != null);
+			Contract.Ensures(this.m_policy != null);
+			
+			// Don't escape a pre-escaped argument.
+			m_arg = flags.HasFlag(ArgumentFlags.PreEscaped)
+				? argumentString
+				: policy.EscapeArgument(argumentString);
+			m_policy = policy;
+		}
+
+		/// <summary>
+		/// Construct an argument from an enumerable of individual unescaped argument strings.  This will use the
+		/// default policy.
+		/// </summary>
+		/// <param name="unescapedArgumentStrings">The argument strings, one per argument.</param>
+		/// <param name="policy">The argument policy to be used.</param>
+		public Argument(IEnumerable<string> unescapedArgumentStrings)
+			: this(ArgumentFlags.None, DefaultPolicy, unescapedArgumentStrings)
+		{
+		}
+
+		/// <summary>
+		/// Construct an argument from an enumerable of individual argument strings.  This will use the default policy.
+		/// </summary>
+		/// <param name="argumentStrings">The argument strings, one per argument.</param>
+		/// <param name="policy">The argument policy to be used.</param>
+		/// <param name="flags">The argument flags used to create this Argument.</param>
+		public Argument(ArgumentFlags flags, IEnumerable<string> argumentStrings)
+			: this(flags, DefaultPolicy, argumentStrings)
+		{
+		}
+
+		/// <summary>
+		/// Construct an argument from an enumerable of individual unescaped argument strings.  The argument will be
+		/// escaped using the given policy.
+		/// </summary>
+		/// <param name="unescapedArgumentStrings">The argument strings, one per argument.</param>
+		/// <param name="policy">The argument policy to be used.</param>
+		public Argument(ArgumentPolicy policy, IEnumerable<string> unescapedArgumentStrings)
+			: this(ArgumentFlags.None, policy, unescapedArgumentStrings)
+		{
+		}
+
+		/// <summary>
+		/// Construct an argument from an enumerable of individual argument strings.  The argument will be
+		/// escaped using the given policy.
+		/// </summary>
+		/// <param name="argumentStrings">The argument strings, one per argument.</param>
+		/// <param name="policy">The argument policy to be used.</param>
+		/// <param name="flags">The argument flags used to create this Argument.</param>
+		public Argument(ArgumentFlags flags, ArgumentPolicy policy, IEnumerable<string> argumentStrings)
+		{
+			Contract.Requires(argumentStrings != null);
+			Contract.ForAll(argumentStrings, s => s != null);
 			Contract.Requires(policy != null);
 			Contract.Ensures(this.m_arg != null);
 			Contract.Ensures(this.m_policy != null);
 
-			m_arg = policy.EscapeArgument(unescapedArgumentString);
+			// Don't escape a pre-escaped argument.
+			m_arg = flags.HasFlag(ArgumentFlags.PreEscaped)
+				? policy.JoinArguments(argumentStrings)
+				: policy.EscapeArguments(argumentStrings);
 			m_policy = policy;
 		}
 
-		// Construct from multiple
-		// Construct pre-escaped
-		
+		/// <summary>
+		/// Construct an argument from the string parameters.  The argument will be escaped using the given policy.
+		/// </summary>
+		/// <param name="argumentStrings">The argument strings, one per argument.</param>
+		/// <param name="policy">The argument policy to be used.</param>
+		/// <param name="flags">The argument flags used to create this Argument.</param>
+		public Argument(ArgumentFlags flags, ArgumentPolicy policy, params string[] argumentStrings)
+			: this(flags, policy, (IEnumerable<string>)argumentStrings)
+		{
+		}
+
+		/// <summary>
+		/// Construct an argument from the string parameters.  The argument will be escaped using the given policy.
+		/// </summary>
+		/// <param name="argumentStrings">The argument strings, one per argument.</param>
+		/// <param name="policy">The argument policy to be used.</param>
+		public Argument(ArgumentPolicy policy, params string[] argumentStrings)
+			: this(ArgumentFlags.None, policy, (IEnumerable<string>)argumentStrings)
+		{
+		}
+
+		/// <summary>
+		/// Construct an argument from the string parameters.  This will use the default policy.
+		/// </summary>
+		/// <param name="argumentStrings">The argument strings, one per argument.</param>
+		/// <param name="flags">The argument flags used to create this Argument.</param>
+		public Argument(ArgumentFlags flags, params string[] argumentStrings)
+			: this(flags, DefaultPolicy, (IEnumerable<string>)argumentStrings)
+		{
+		}
+
+		/// <summary>
+		/// Construct an argument from the string parameters.  The argument will be escaped using the given policy.
+		/// </summary>
+		/// <param name="argumentStrings">The argument strings, one per argument.</param>
+		public Argument(params string[] argumentStrings)
+			: this(ArgumentFlags.None, DefaultPolicy, (IEnumerable<string>)argumentStrings)
+		{
+		}
 
 		/// <summary>
 		/// Implicit conversion operator to convert an argument to a string.

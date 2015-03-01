@@ -95,6 +95,12 @@ namespace ProcessArgumentToolsTests
 			Assert.AreEqual(1, parsed.Length);
 			Assert.AreEqual(input, parsed[0]);
 		}
+
+		[TestMethod]
+		public void TestJoinArgs()
+		{
+			Assert.AreEqual(@"a b c", p.JoinArguments(new string[] { @"a", @"b", @"c" }));
+		}
 		
 		[TestMethod]
 		public void TestEmptyArgs()
