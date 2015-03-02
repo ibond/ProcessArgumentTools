@@ -4,3 +4,4 @@
 // Make testing against CommandLineToArgvW optional in case that API isn't available.  Use T4 to create a template?
 // Cache the argument build buffers in a TLS variable.
 // Add code coverage settings
+// Build documentation pages

@@ -12,7 +12,7 @@
 		<description>A small toolkit for the surprisingly complex issue of managing process arguments.</description>
 		<releaseNotes>Initial version.</releaseNotes>
 		<copyright>Copyright 2015</copyright>
-		<tags>command line arguments process</tags>
+		<tags>command line arguments process .NET</tags>
 		<dependencies>
 		</dependencies>
 	</metadata>
