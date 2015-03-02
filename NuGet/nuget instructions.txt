@@ -1,0 +1,2 @@
+nuget pack ProcessArgumentTools.nuspec
+nuget push ProcessArgumentTools.nupkg
