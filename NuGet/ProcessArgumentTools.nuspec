@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<package >
+	<metadata>
+		<id>ProcessArgumentTools</id>
+		<title>Process Argument Tools</title>
+		<version>0.5.0</version>
+		<authors>Ian Bond</authors>
+		<owners>Ian Bond</owners>
+		<licenseUrl>https://github.com/ibond/ProcessArgumentTools/blob/master/LICENSE.txt</licenseUrl>
+		<projectUrl>https://github.com/ibond/ProcessArgumentTools</projectUrl>
+		<requireLicenseAcceptance>false</requireLicenseAcceptance>
+		<description>A small toolkit for the surprisingly complex issue of managing process arguments.</description>
+		<releaseNotes>Initial version.</releaseNotes>
+		<copyright>Copyright 2015</copyright>
+		<tags>command line arguments process</tags>
+		<dependencies>
+		</dependencies>
+	</metadata>
+	<files>
+		<file src="..\ProcessArgumentTools\bin\Debug\*.dll" target="lib\net45" /> 
+	</files>
+</package>
