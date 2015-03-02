@@ -1,4 +1,4 @@
-Copyright (c) 2014, Ian Bond
+Copyright (c) 2015, Ian Bond
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
