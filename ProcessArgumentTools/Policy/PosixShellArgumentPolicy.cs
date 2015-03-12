@@ -208,7 +208,7 @@ namespace ProcessArgumentTools.Policy
 		/// <summary>
 		/// Checks if the character would cause an argument to require escaping.
 		/// 
-		/// | & ; &lt; &gt; ( ) $ ` \ " ' {space} \t \n * ? [ # ~ = %
+		/// | &amp; ; &lt; &gt; ( ) $ ` \ " ' {space} \t \n * ? [ # ~ = %
 		/// </summary>
 		/// <param name="value">The character to be tested.</param>
 		/// <returns>true if the character given would require the argument to be escaped, false otherwise.</returns>

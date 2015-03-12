@@ -1,7 +1,15 @@
-﻿
-// TODO: Add IOC for specifying default policy.
+﻿// TODO: Add IOC for specifying default policy.
 // Add more code contracts.
 // Make testing against CommandLineToArgvW optional in case that API isn't available.  Use T4 to create a template?
 // Cache the argument build buffers in a TLS variable.
 // Add code coverage settings
 // Build documentation pages
+// Add a Split function to break an argument down into a list of Arguments that are still escaped.
+// Add a CONTRIBUTING.md file with example ideas to implement.
+// Add CMD.exe policy.
+// Add implicit conversion from Argument to IEnumerable<Argument>?
+// Add some sort of .UsingPolicy(p) function or ToString(policy) to get the string from an argument making sure it's in the right format.
+// Add forceQuotes option.
+// Assume escaping and do the string copy only if we don't need to escape, reverse of what we currently do.
+// Add docs to the project and automatically paste in example code.
+// Fix doc warnings

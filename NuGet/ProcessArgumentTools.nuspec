@@ -18,5 +18,6 @@
 	</metadata>
 	<files>
 		<file src="..\ProcessArgumentTools\bin\Debug\*.dll" target="lib\net45" /> 
+		<file src="..\ProcessArgumentTools\bin\Debug\*.xml" target="lib\net45" /> 
 	</files>
 </package>
